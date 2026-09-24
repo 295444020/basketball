@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>篮球比赛计分系统</title>
+<style>
+:root{
+  --bg:#0a0e15; --panel:#121a26; --panel2:#18222f; --line:#243043;
+  --text:#e8eef7; --muted:#8fa0b8; --accent:#f08c00; --ok:#37b24d; --warn:#f76707; --danger:#f03e3e;
+  --home:#ff6b6b; --away:#4dabf7;
+  --radius:12px;
+  --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+body.light{
+  --bg:#f4f6fa; --panel:#ffffff; --panel2:#eef1f7; --line:#dbe1ea;
+  --text:#101828; --muted:#667085; --accent:#e8590c; --ok:#2f9e44; --warn:#e8590c; --danger:#e03131;
+  --home:#d6336c; --away:#1c7ed6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+.app{max-width:1500px;margin:0 auto;padding:14px 16px 40px}
+
+/* ---------- topbar ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 4px 14px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:19px;flex:none}
+.brand h1{font-size:17px;font-weight:600;letter-spacing:.2px}
+.brand p{font-size:12px;color:var(--muted)}
+.topbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.save-hint{font-size:12px;color:var(--muted);opacity:.85}
+
+.btn{padding:7px 13px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:13px;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ok);border-color:var(--ok);color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.warn{background:transparent;border-color:var(--warn);color:var(--warn)}
+.btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+.btn.sm{padding:4px 9px;font-size:12px;border-radius:7px}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:10px;overflow-x:auto}
+.tab{padding:7px 15px;border-radius:9px;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.tab:hover{background:var(--panel2);color:var(--text)}
+.tab.active{background:var(--panel);color:var(--text);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
+.view{display:none;padding-top:16px}
+.view.active{display:block}
+
+/* ---------- scoreboard ---------- */
+.board{display:grid;grid-template-columns:1fr minmax(300px,360px) 1fr;gap:14px}
+@media(max-width:1080px){.board{grid-template-columns:1fr}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.team-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:8px}
+.team-name{background:transparent;border:1px dashed transparent;border-radius:7px;font-size:17px;font-weight:700;padding:2px 6px;max-width:190px;width:100%}
+.team-name:hover,.team-name:focus{border-color:var(--line);background:var(--panel2);outline:none}
+.team-side{font-size:11px;letter-spacing:1.5px;color:var(--muted);font-weight:600}
+.home .team-side{color:var(--home)}
+.away .team-side{color:var(--away)}
+.badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:4px}
+.badge{font-size:11.5px;padding:2px 8px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.badge b{color:var(--text)}
+.badge.bonus{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
+.badge.bonus b{color:#fff}
+
+.score-wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 10px}
+.score{font-family:var(--mono);font-size:clamp(56px,7.5vw,92px);font-weight:700;line-height:.95;letter-spacing:-2px;font-variant-numeric:tabular-nums;flex:1;text-align:center}
+.home .score{color:var(--home)}
+.away .score{color:var(--away)}
+.minus-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--muted);font-size:16px;flex:none}
+.minus-btn:hover{color:var(--danger);border-color:var(--danger)}
+
+.add-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.add-btn{padding:11px 0;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.home .add-btn:hover{border-color:var(--home);color:var(--home)}
+.away .add-btn:hover{border-color:var(--away);color:var(--away)}
+.add-btn small{display:block;font-size:10.5px;font-weight:400;color:var(--muted);letter-spacing:.3px}
+
+.ctrl-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ctrl-row .btn{padding:9px 0;text-align:center}
+
+/* ---------- center console ---------- */
+.console{display:flex;flex-direction:column;gap:10px}
+.period-chip{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:var(--muted)}
+.period-chip b{font-size:14px;color:var(--text);background:var(--panel2);border:1px solid var(--line);padding:3px 12px;border-radius:20px}
+.clock-box{text-align:center;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:14px 10px}
+.clock-label{font-size:11px;letter-spacing:2px;color:var(--muted)}
+.clock{font-family:var(--mono);font-size:clamp(40px,5.5vw,58px);font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1.1}
+.clock.low{color:var(--danger)}
+.shot-row{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+.shot{font-family:var(--mono);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.shot.low{color:var(--danger)}
+.shot-flash{animation:flash .5s ease-in-out 3}
+@keyframes flash{50%{opacity:.15}}
+.possession{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.arrow{font-size:15px}
+.arrow.home{color:var(--home)}.arrow.away{color:var(--away)}
+.big-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.big-btns .btn{padding:12px 0;text-align:center;font-size:14px}
+#btnStart{grid-column:1/-1;font-size:15px}
+.pulse{animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+
+/* ---------- roster ---------- */
+.rosters{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media(max-width:760px){.rosters{grid-template-columns:1fr}}
+.roster-panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.roster-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.roster-head h3{font-size:13.5px;font-weight:600}
+.roster-head .hint{font-size:11.5px;color:var(--muted)}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px}
+.pcard{position:relative;text-align:left;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);transition:.15s}
+.pcard:hover{border-color:var(--muted)}
+.pcard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.pcard.bench{opacity:.5}
+.pcard.out{opacity:.45;border-style:dashed}
+.pcard .num{font-family:var(--mono);font-size:15px;font-weight:700;margin-right:6px}
+.pcard .nm{font-size:12.5px;color:var(--muted)}
+.pcard .ln1{display:flex;align-items:baseline}
+.pcard .ln2{display:flex;gap:8px;margin-top:5px;font-size:11px;color:var(--muted)}
+.pcard .ln2 b{color:var(--text);font-weight:600}
+.pcard .foul-btn{position:absolute;top:6px;right:6px;font-size:10.5px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+.pcard .foul-btn:hover{border-color:var(--danger);color:var(--danger)}
+.pcard .out-tag{position:absolute;top:6px;right:6px;font-size:10px;color:var(--danger);border:1px solid var(--danger);border-radius:6px;padding:0 5px}
+.sel-note{margin-top:10px;font-size:12px;color:var(--muted)}
+.sel-note b{color:var(--accent)}
+
+/* ---------- tables ---------- */
+.tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.tbl-head{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.tbl-head .tot{font-family:var(--mono);font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 8px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:11.5px;background:var(--panel2)}
+td.name,th.name{text-align:left;min-width:110px;position:sticky;left:0;background:var(--panel)}
+tr.bench-row td{color:var(--muted)}
+tr.out-row td{text-decoration:line-through;opacity:.6}
+.stepper{display:inline-flex;align-items:center;gap:3px;justify-content:center}
+.stepper span{min-width:20px;display:inline-block;font-variant-numeric:tabular-nums;font-weight:600}
+.stepper button{width:17px;height:17px;line-height:15px;border-radius:5px;border:1px solid var(--line);color:var(--muted);font-size:11px;padding:0}
+.stepper button:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- log ---------- */
+.log-list{max-height:520px;overflow:auto}
+.log-item{display:flex;gap:12px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:13px;align-items:baseline}
+.log-item .t{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex:none;min-width:118px}
+.log-item .side{flex:none;font-size:11px;padding:1px 7px;border-radius:6px;border:1px solid var(--line)}
+.log-item .side.home{color:var(--home);border-color:var(--home)}
+.log-item .side.away{color:var(--away);border-color:var(--away)}
+.empty{padding:34px;text-align:center;color:var(--muted);font-size:13px}
+
+/* ---------- settings ---------- */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.card h3{font-size:14px;font-weight:600;margin-bottom:4px}
+.card .desc{font-size:12px;color:var(--muted);margin-bottom:14px}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.preset{padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);font-size:12.5px;text-align:left}
+.preset small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.preset.active{border-color:var(--accent);color:var(--accent)}
+.preset.active small{color:var(--accent);opacity:.8}
+.field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;color:var(--muted)}
+.field input[type=number],.field input[type=text]{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+.field input:focus{outline:none;border-color:var(--accent)}
+.switch-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.switch-row:last-child{border-bottom:none}
+.sw{position:relative;width:40px;height:22px;border-radius:20px;background:var(--line);transition:.2s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--ok)}
+.sw.on::after{left:21px}
+.rrow{display:grid;grid-template-columns:64px 1fr 92px 70px 34px;gap:8px;align-items:center;margin-bottom:7px}
+.rrow input,.rrow select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;width:100%;font-size:12.5px}
+.rrow .del{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+.rrow .del:hover{border-color:var(--danger);color:var(--danger)}
+.rrow.head{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+.rrow.head span{padding-left:2px}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- help ---------- */
+.help h2{font-size:15px;font-weight:600;margin:20px 0 8px}
+.help h2:first-child{margin-top:0}
+.help p,.help li{font-size:13px;color:var(--muted);line-height:1.75}
+.help ul{padding-left:20px;margin:6px 0}
+.help b{color:var(--text);font-weight:600}
+.help table{margin-top:8px}
+.help td,.help th{text-align:left;padding:7px 10px}
+
+/* ---------- big screen ---------- */
+body.bigscreen .topbar,body.bigscreen .tabs,body.bigscreen .rosters{display:none}
+body.bigscreen .score{font-size:clamp(80px,13vw,180px)}
+body.bigscreen .clock{font-size:clamp(60px,9vw,120px)}
+body.bigscreen .shot{font-size:44px}
+body.bigscreen .app{max-width:none;padding:24px 28px}
+body.bigscreen .board{grid-template-columns:1fr minmax(320px,420px) 1fr}
+.big-exit{display:none}
+body.bigscreen .big-exit{display:inline-block;position:fixed;right:18px;bottom:18px;z-index:9}
+/* ============ 登录模块 ============ */
+.login-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(1200px 700px at 50% 30%,#1d2a3f,#0b1220 72%);color:#e8edf5}
+.login-gate.hide{display:none}
+.login-card{width:min(370px,92vw);background:#141d2c;border:1px solid rgba(255,255,255,.09);border-radius:16px;
+  padding:34px 32px 28px;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+.login-card .logo{width:52px;height:52px;font-size:26px;border-radius:14px;margin:0 auto}
+.login-card h2{margin:14px 0 4px;font-size:20px;text-align:center}
+.login-sub{font-size:13px;color:#93a3b8;margin:0 0 18px;text-align:center}
+.login-card input{width:100%;margin-bottom:12px;background:#0e1622;border:1px solid rgba(255,255,255,.16);color:#e8edf5}
+.login-card input::placeholder{color:#5f7188}
+#loginErr{color:#ff7b72;font-size:12.5px;min-height:18px;margin-bottom:6px}
+.login-hint{font-size:12px;color:#7c8ba1;margin:14px 0 0;line-height:1.6;text-align:center}
+.login-card.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-7px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
+body.locked{overflow:hidden}
+.user-chip{font-size:12px;color:var(--muted);padding:4px 10px;border:1px solid var(--line);border-radius:8px;white-space:nowrap}
+.acct-table td{padding:6px 8px;font-size:13px}
+.badge-you{display:inline-block;font-size:11px;color:#0a7f43;background:rgba(34,197,94,.15);border-radius:6px;padding:1px 6px;margin-left:4px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:9px 18px;border-radius:10px;font-size:13px;z-index:20;box-shadow:0 6px 24px rgba(0,0,0,.28)}
+</style>
+</head>
+<body class="light">
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">B</div>
+      <div>
+        <h1>篮球比赛计分系统</h1>
+        <p id="matchMeta">— </p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="user-chip" id="userChip"></span>
+      <span class="save-hint" id="saveHint">自动保存中</span>
+      <button class="btn" id="btnUndo">撤销上一步</button>
+      <button class="btn primary" id="btnBig">打开大屏显示</button>
+      <button class="btn" id="btnTheme">深色</button>
+      <button class="btn" id="btnLogout" data-act="logout">退出登录</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="scoreboard">计分台</button>
+    <button class="tab" data-view="stats">技术统计</button>
+    <button class="tab" data-view="log">比赛记录</button>
+    <button class="tab" data-view="settings">规则与球队设置</button>
+    <button class="tab" data-view="help">规则说明</button>
+  </nav>
+
+  <main>
+    <section class="view active" id="view-scoreboard">
+      <div class="board">
+        <div class="panel team home" id="panelHome" data-side="home"></div>
+        <div class="panel console" id="console"></div>
+        <div class="panel team away" id="panelAway" data-side="away"></div>
+      </div>
+      <div class="rosters">
+        <div class="roster-panel" id="rosterHome" data-side="home"></div>
+        <div class="roster-panel" id="rosterAway" data-side="away"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-stats"></section>
+    <section class="view" id="view-log"></section>
+    <section class="view" id="view-settings"></section>
+    <section class="view help" id="view-help"></section>
+  </main>
+</div>
+<button class="btn big-exit" id="btnBigExit">退出大屏</button>
+
+<!-- 登录门：未登录时覆盖整个系统 -->
+<div id="loginGate" class="login-gate hide">
+  <div class="login-card" id="loginCard">
+    <div class="logo">B</div>
+    <h2>篮球比赛计分系统</h2>
+    <p class="login-sub">操作台受口令保护，请登录后使用</p>
+    <form id="loginForm" autocomplete="off">
+      <input id="loginUser" type="text" placeholder="用户名" required>
+      <input id="loginPw" type="password" placeholder="密码" required>
+      <div id="loginErr"></div>
+      <button type="submit" class="btn primary" style="width:100%;padding:10px">登 录</button>
+    </form>
+    <p class="login-hint" id="loginHint"></p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const LS_KEY="bball-scoreboard-v1";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+/* ============ 规则预设（依据 FIBA / NBA 现行标准规则） ============ */
+const PRESETS={
+  fiba:{label:"FIBA 国际篮联标准",sub:"4 节 × 10 分钟 · 24 秒 · 5 犯离场",
+    rules:{periods:4,periodMinutes:10,overtimeMinutes:5,shotClock:24,shotClockEnabled:true,
+      personalFoulLimit:5,teamFoulLimit:4,teamFoulPenalty:true,bonusFreeThrows:2,
+      timeoutsFirstHalf:2,timeoutsSecondHalf:3,overtimeTimeouts:1,timeoutSeconds:60,
+      foulOutEnabled:true,name:"FIBA 国际篮联标准"}},
+  nba:{label:"NBA 职业联赛标准",sub:"4 节 × 12 分钟 · 24 秒 · 6 犯离场",
+    rules:{periods:4,periodMinutes:12,overtimeMinutes:5,shotClock:24,shotClockEnabled:true,
+      personalFoulLimit:6,teamFoulLimit:4,teamFoulPenalty:true,bonusFreeThrows:2,
+      timeoutsFirstHalf:4,timeoutsSecondHalf:3,overtimeTimeouts:2,timeoutSeconds:75,
+      foulOutEnabled:true,name:"NBA 职业联赛标准"}},
+  fiba3x3:{label:"FIBA 三人篮球 (3x3)",sub:"1 节 10 分钟 · 12 秒 · 21 分制",
+    rules:{periods:1,periodMinutes:10,overtimeMinutes:1,shotClock:12,shotClockEnabled:true,
+      personalFoulLimit:5,teamFoulLimit:6,teamFoulPenalty:true,bonusFreeThrows:2,
+      timeoutsFirstHalf:1,timeoutsSecondHalf:0,overtimeTimeouts:0,timeoutSeconds:30,
+      foulOutEnabled:true,name:"FIBA 三人篮球 (3x3)"}},
+  custom:{label:"自定义赛制",sub:"自由配置全部规则参数",rules:null}
+};
+const RULE_META=[
+  ["periods","比赛节数","节"],
+  ["periodMinutes","每节时长","分钟"],
+  ["overtimeMinutes","加时赛时长","分钟"],
+  ["shotClock","进攻时限","秒"],
+  ["timeoutSeconds","每次暂停时长","秒"],
+  ["personalFoulLimit","个人犯规离场次数","次"],
+  ["teamFoulLimit","全队犯规处罚阈值","次"],
+  ["timeoutsFirstHalf","上半场暂停次数","次"],
+  ["timeoutsSecondHalf","下半场暂停次数","次"],
+  ["overtimeTimeouts","加时赛暂停次数","次"],
+  ["bonusFreeThrows","处罚状态罚球次数","次"]
+];
+const SWITCH_META=[
+  ["shotClockEnabled","启用 24 秒进攻时限模块"],
+  ["teamFoulPenalty","启用全队犯规处罚（BONUS）"],
+  ["foulOutEnabled","启用个人犯规离场（犯满罚下）"]
+];
+const STAT_COLS=[["fgm2","2分"],["fgm3","3分"],["ftm","罚球"],["reb","篮板"],["ast","助攻"],["stl","抢断"],["blk","盖帽"],["tov","失误"],["pf","犯规"]];
+const ZERO=()=>({fgm2:0,fgm3:0,ftm:0,reb:0,ast:0,stl:0,blk:0,tov:0,pf:0,out:false});
+
+/* ============ 状态 ============ */
+let uid=1;const nid=()=>"p"+(uid++)+"_"+Math.random().toString(36).slice(2,6);
+function makeRoster(prefix){
+  const pos=["PG","SG","SF","PF","C"];
+  return pos.map((p,i)=>({id:nid(),num:[4,5,6,7,8][i],name:prefix+(i+1),pos:p,onCourt:true,...ZERO()}));
+}
+function freshMatch(rules){
+  return{
+    period:1,clockMs:rules.periodMinutes*60000,clockRunning:false,
+    shotMs:rules.shotClock*1000,shotRunning:false,periodOver:false,
+    score:{home:0,away:0},periodScore:[{home:0,away:0}],teamFouls:[{home:0,away:0}],
+    timeouts:{home:{h1:0,h2:0,ot:0},away:{h1:0,h2:0,ot:0}},
+    possession:"home",selected:{home:null,away:null},log:[],started:false
+  };
+}
+function initialState(){
+  const rules=JSON.parse(JSON.stringify(PRESETS.fiba.rules));
+  return{preset:"fiba",theme:"light",rules,
+    home:{name:"主队",players:makeRoster("球员")},
+    away:{name:"客队",players:makeRoster("球员")},
+    match:freshMatch(rules)};
+}
+let S=load()||initialState();
+
+function load(){
+  try{const raw=localStorage.getItem(LS_KEY);if(!raw)return null;const d=JSON.parse(raw);
+    if(!d||!d.rules||!d.match)return null;return d;}catch(e){return null;}
+}
+let saveTimer=null,storageOK=true;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    try{localStorage.setItem(LS_KEY,JSON.stringify(S));storageOK=true;}catch(e){storageOK=false;}
+    publish(true);
+    const h=$("#saveHint");
+    if(h)h.textContent=storageOK
+      ? "已自动保存 "+new Date().toLocaleTimeString("zh-CN",{hour12:false})
+      : "本地存储不可用，请勿刷新页面（可导出 JSON 备份）";
+  },250);
+}
+
+/* ============ 大屏显示页：实时数据通道 ============ */
+const LS_DISPLAY="bball-display-v1",CH_NAME="bball-scoreboard-live";
+let chan=null;
+try{chan=new BroadcastChannel(CH_NAME);}catch(e){chan=null;}
+let lastPub=0,lastMirror=0;
+function payload(){
+  const r=S.rules,m=S.match;
+  const players=side=>S[side].players.slice()
+    .sort((a,b)=>((b.onCourt&&!b.out)?1:0)-((a.onCourt&&!a.out)?1:0)||a.num-b.num)
+    .map(p=>({num:p.num,name:p.name,pf:p.pf,pts:teamPts(p),onCourt:!!p.onCourt,out:!!p.out}));
+  const mk=side=>({
+    name:S[side].name,score:m.score[side],ps:pScore(m.period)[side],fouls:pFouls(m.period)[side],
+    bonus:r.teamFoulPenalty&&pFouls(m.period)[side]>=r.teamFoulLimit,
+    tUsed:m.timeouts[side][halfKey(m.period)],tLimit:timeoutLimit(m.period),
+    players:players(side)
+  });
+  return{v:1,ts:Date.now(),teams:[mk("home"),mk("away")],
+    period:periodLabel(m.period),isOT:m.period>r.periods,periodOver:m.periodOver,
+    clockMs:m.clockMs,clockRunning:m.clockRunning,shotMs:m.shotMs,shotEnabled:!!r.shotClockEnabled,
+    possession:m.possession,rule:r.name||"自定义赛制",
+    eventName:(r.eventName&&r.eventName.trim())||r.name||"篮球比赛",
+    foulLimit:r.personalFoulLimit};
+}
+function publish(force){
+  const now=Date.now(),p=payload();
+  const mirror=force||now-lastMirror>1000;
+  if(!force&&now-lastPub<120)return;
+  lastPub=now;
+  if(chan)try{chan.postMessage(p);}catch(e){}
+  if(mirror){lastMirror=now;try{localStorage.setItem(LS_DISPLAY,JSON.stringify(p));}catch(e){}}
+}
+let displayWin=null;
+function openDisplay(){
+  const url=new URL("display.html",location.href).href;
+  let w=null;
+  try{w=window.open(url,"bball_display","width=1400,height=820,menubar=no,toolbar=no,location=no,status=no");}catch(e){w=null;}
+  publish(true);
+  if(!w){
+    document.body.classList.add("bigscreen");
+    toast("弹窗被浏览器拦截，已改在当前页面放大显示；也可在「规则与球队设置」中手动打开大屏页");
+    return;
+  }
+  displayWin=w;
+  try{w.focus();}catch(e){}
+  setTimeout(()=>publish(true),300);
+  setTimeout(()=>publish(true),1200);
+  toast("大屏显示窗口已打开：拖到投影屏后按 F 键全屏");
+}
+
+/* ============ 撤销栈 ============ */
+let history=[];
+function snapshot(){history.push(JSON.stringify(S));if(history.length>80)history.shift();}
+function undo(){
+  if(!history.length)return toast("没有可撤销的操作");
+  const prev=history.pop();
+  const theme=S.theme;S=JSON.parse(prev);S.theme=theme;
+  renderAll();save();toast("已撤销上一步");
+}
+
+/* ============ 工具 ============ */
+function pad(n){return String(n).padStart(2,"0");}
+function fmtClock(ms){
+  if(ms<0)ms=0;
+  const t=ms/1000;
+  if(t<60)return t.toFixed(1).padStart(4,"0");
+  return pad(Math.floor(t/60))+":"+pad(Math.floor(t%60));
+}
+function fmtShot(ms){
+  const t=Math.max(0,ms/1000);
+  return t<5?t.toFixed(1):String(Math.ceil(t));
+}
+function periodLabel(p){return p<=S.rules.periods?"第 "+p+" 节":"加时 "+ (p-S.rules.periods);}
+function halfKey(p){return p> S.rules.periods ? "ot" : (p<= Math.ceil(S.rules.periods/2) ? "h1":"h2");}
+function timeoutLimit(p){
+  if(p>S.rules.periods)return S.rules.overtimeTimeouts;
+  return p<=Math.ceil(S.rules.periods/2)?S.rules.timeoutsFirstHalf:S.rules.timeoutsSecondHalf;
+}
+function pScore(p){const a=S.match.periodScore;while(a.length<p)a.push({home:0,away:0});return a[p-1];}
+function pFouls(p){const a=S.match.teamFouls;while(a.length<p)a.push({home:0,away:0});return a[p-1];}
+function teamPts(pl){return pl.fgm2*2+pl.fgm3*3+pl.ftm;}
+function teamTotal(side){return S[side].players.reduce((s,p)=>s+teamPts(p),0);}
+function findP(side,pid){return S[side].players.find(p=>p.id===pid);}
+let toastTimer=null;
+function toast(msg){
+  const old=$(".toast");if(old)old.remove();
+  const el=document.createElement("div");el.className="toast";el.textContent=msg;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.remove(),1900);
+}
+
+/* ============ 蜂鸣器 / 提示音 ============ */
+let audioCtx=null;
+function beep(freq=880,dur=0.9,type="square"){
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(0.16,audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+    o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+/* ============ 事件记录 ============ */
+function logEvent(text,side){
+  S.match.log.unshift({t:matchTimeLabel(),text,side:side||null,at:Date.now()});
+  if(S.match.log.length>500)S.match.log.pop();
+}
+function matchTimeLabel(){
+  return periodLabel(S.match.period)+" · "+fmtClock(S.match.clockMs);
+}
+
+/* ============ 核心动作 ============ */
+function setClock(ms){S.match.clockMs=Math.max(0,ms);}
+function startClock(){
+  if(S.match.periodOver)return toast("本"+(S.match.period<=S.rules.periods?"节":"加时")+"已结束，请进入下一节");
+  if(!S.match.started){S.match.started=true;logEvent("比赛开始 · 跳球","home");}
+  S.match.clockRunning=true;S.match.shotRunning=true;
+  beep(1200,0.08,"sine");renderAll();save();
+}
+function stopClock(silent){
+  S.match.clockRunning=false;S.match.shotRunning=false;
+  if(!silent){logEvent("暂停计时","");beep(1500,0.12,"sine");}
+  renderAll();save();
+}
+function toggleClock(){S.match.clockRunning?stopClock():startClock();}
+function resetShot(sec){
+  S.match.shotMs=(sec!==undefined?sec:S.rules.shotClock)*1000;
+  renderAll();save();
+}
+function resetShotIfNeeded(){if(S.rules.shotClockEnabled)resetShot();}
+function switchPossession(to){
+  S.match.possession=to||(S.match.possession==="home"?"away":"home");
+  if(S.rules.shotClockEnabled)S.match.shotMs=S.rules.shotClock*1000;
+  renderAll();save();
+}
+function addScore(side,pts){
+  snapshot();
+  S.match.score[side]+=pts;
+  pScore(S.match.period)[side]+=pts;
+  const pid=S.match.selected[side];const p=pid?findP(side,pid):null;
+  if(p){
+    if(pts===1)p.ftm++;else if(pts===2)p.fgm2++;else if(pts===3)p.fgm3++;
+    logEvent(S[side].name+" "+p.num+"号 "+p.name+" 命中"+pts+"分"+((pts===1)?"（罚球）":"（"+pts+"分球）") +"　比分 "+S.match.score.home+":"+S.match.score.away,side);
+  }else{
+    logEvent(S[side].name+" +"+pts+" 分（未指定球员）　比分 "+S.match.score.home+":"+S.match.score.away,side);
+  }
+  beep(660,0.09,"sine");
+  if(S.rules.shotClockEnabled&&pts>0){S.match.shotMs=S.rules.shotClock*1000;S.match.possession=side==="home"?"away":"home";}
+  renderAll();save();
+}
+function subScore(side,pts){
+  snapshot();
+  S.match.score[side]=Math.max(0,S.match.score[side]-pts);
+  const ps=pScore(S.match.period);ps[side]=Math.max(0,ps[side]-pts);
+  const pid=S.match.selected[side];const p=pid?findP(side,pid):null;
+  if(p){if(pts===1&&p.ftm>0)p.ftm--;else if(pts===2&&p.fgm2>0)p.fgm2--;else if(pts===3&&p.fgm3>0)p.fgm3--;}
+  logEvent("更正："+S[side].name+" -"+pts+" 分","");
+  renderAll();save();
+}
+function addFoul(side,pid){
+  snapshot();
+  const p=pid?findP(side,pid):null;
+  const f=pFouls(S.match.period);f[side]++;
+  if(p){
+    p.pf++;
+    const name=p.num+"号 "+p.name;
+    if(S.rules.foulOutEnabled&&p.pf>=S.rules.personalFoulLimit){
+      p.out=true;p.onCourt=false;
+      if(S.match.selected[side]===p.id)S.match.selected[side]=null;
+      logEvent(name+" 个人犯规达 "+p.pf+" 次，罚出场外",side);beep(320,0.7);
+    }else{
+      logEvent(name+" 犯规（个人 "+p.pf+" 次 / 全队 "+f[side]+" 次）"+(f[side]>=S.rules.teamFoulLimit?"　→ 进入处罚状态":""),side);
+      beep(420,0.22);
+    }
+  }else{
+    logEvent(S[side].name+" 全队犯规 +1（共 "+f[side]+" 次）","");
+    beep(420,0.22);
+  }
+  renderAll();save();
+}
+function useTimeout(side){
+  const k=halfKey(S.match.period),limit=timeoutLimit(S.match.period),used=S.match.timeouts[side][k];
+  snapshot();
+  if(used>=limit){
+    history.pop();
+    return toast(periodLabel(S.match.period)+" 暂停次数已用完（上限 "+limit+" 次）");
+  }
+  S.match.timeouts[side][k]++;
+  stopClock(true);
+  logEvent(S[side].name+" 请求暂停（本节段 "+ (used+1) +"/"+limit+"，暂停时长 "+S.rules.timeoutSeconds+" 秒）",side);
+  beep(880,0.35,"sine");
+  renderAll();save();
+}
+function toggleCourt(side,pid){
+  snapshot();
+  const p=findP(side,pid);
+  if(p.out){history.pop();return toast("该球员已犯满离场，不能重新上场");}
+  p.onCourt=!p.onCourt;
+  logEvent(S[side].name+" 换人："+p.num+"号 "+p.name+(p.onCourt?" 上场":" 下场"),side);
+  renderAll();save();
+}
+function nextPeriod(){
+  snapshot();
+  S.match.clockRunning=false;S.match.shotRunning=false;
+  const next=S.match.period+1;
+  if(S.match.period<=S.rules.periods&&next>S.rules.periods){
+    logEvent("第四节结束 · 常规时间结束","");
+    beep(220,1.4);
+  }
+  S.match.period=next;
+  const mins=next<=S.rules.periods?S.rules.periodMinutes:S.rules.overtimeMinutes;
+  S.match.clockMs=mins*60000;
+  S.match.shotMs=S.rules.shotClock*1000;S.match.periodOver=false;S.match.started=false;
+  pScore(next);pFouls(next);
+  logEvent("进入 "+periodLabel(next)+"（时长 "+mins+" 分钟）","");
+  beep(1000,0.3,"sine");
+  renderAll();save();
+}
+function newMatch(keepSetup){
+  snapshot();
+  if(!confirm(keepSetup?"确定要重新开始本场比赛吗？（球队名单与规则保留）":"确定要恢复出厂设置吗？所有数据将被清空")){
+    history.pop();return;
+  }
+  const rules=S.rules,home=S.home,away=S.away,theme=S.theme,preset=S.preset;
+  S=initialState();
+  if(keepSetup){S.rules=rules;S.home=home;S.away=away;S.preset=preset;
+    S.home.players.forEach(p=>{Object.assign(p,ZERO());p.onCourt=true;});
+    S.away.players.forEach(p=>{Object.assign(p,ZERO());p.onCourt=true;});}
+  S.theme=theme;history=[];
+  document.body.className=theme==="dark"?"":"light";
+  renderAll();save();toast(keepSetup?"比赛已重新开始":"已恢复出厂设置");
+}
+function applyPreset(key){
+  if(key==="custom"){S.preset="custom";renderAll();save();return;}
+  snapshot();
+  const keepEvent=S.rules.eventName;
+  S.rules=JSON.parse(JSON.stringify(PRESETS[key].rules));
+  S.rules.eventName=keepEvent||PRESETS[key].label;
+  S.preset=key;
+  if(!S.match.started){
+    S.match.clockMs=S.rules.periodMinutes*60000;
+    S.match.shotMs=S.rules.shotClock*1000;
+  }
+  renderAll();save();toast("已应用预设："+PRESETS[key].label);
+}
+
+/* ============ 计时循环 ============ */
+let lastTick=null;
+setInterval(()=>{
+  const now=performance.now();
+  const dt=lastTick===null?0:now-lastTick;lastTick=now;
+  const m=S.match;let dirty=false;
+  if(m.clockRunning&&m.clockMs>0){
+    m.clockMs-=dt;dirty=true;
+    if(m.clockMs<=0){
+      m.clockMs=0;m.clockRunning=false;m.shotRunning=false;m.periodOver=true;dirty=true;
+      logEvent(periodLabel(m.period)+"结束　比分 "+m.score.home+":"+m.score.away,"");
+      beep(220,1.6);renderAll();
+    }
+  }
+  if(m.clockRunning&&S.rules.shotClockEnabled&&m.shotMs>0){
+    m.shotMs-=dt;dirty=true;
+    if(m.shotMs<=0){
+      m.shotMs=0;m.shotRunning=false;m.clockRunning=false;dirty=true;
+      logEvent(S[m.possession].name+" 24 秒进攻时限违例（进攻时限耗尽）",m.possession);
+      beep(300,0.9);renderAll();
+    }
+  }
+  if(dirty&&S.match.clockRunning)renderClocks();
+  if(dirty)publish();
+},60);
+
+/* ============ 渲染：计分台 ============ */
+function teamPanel(side){
+  const t=S[side],f=pFouls(S.match.period)[side],limit=timeoutLimit(S.match.period);
+  const k=halfKey(S.match.period),used=S.match.timeouts[side][k];
+  const bonus=f>=S.rules.teamFoulLimit;
+  const sel=S.match.selected[side],sp=sel?findP(side,sel):null;
+  const label=side==="home"?"HOME":"AWAY";
+  return `
+  <div class="team-head">
+    <div style="flex:1">
+      <div class="team-side">${label}</div>
+      <input class="team-name" data-act="teamName" data-side="${side}" value="${esc(t.name)}" maxlength="16">
+    </div>
+  </div>
+  <div class="badges">
+    <span class="badge">节得分 <b>${pScore(S.match.period)[side]}</b></span>
+    <span class="badge">全队犯规 <b>${f}</b></span>
+    ${bonus?`<span class="badge bonus">BONUS 处罚</span>`:`<span class="badge">再犯 ${Math.max(0,S.rules.teamFoulLimit-f)} 次进入处罚</span>`}
+    <span class="badge">暂停 <b>${used}/${limit}</b></span>
+  </div>
+  <div class="score-wrap">
+    <button class="minus-btn" data-act="sub" data-side="${side}" data-pts="1" title="更正：减少 1 分">−</button>
+    <div class="score">${S.match.score[side]}</div>
+    <button class="minus-btn" data-act="sub" data-side="${side}" data-pts="2" title="更正：减少 2 分">−</button>
+  </div>
+  <div class="add-row">
+    <button class="add-btn" data-act="score" data-side="${side}" data-pts="1">+1<small>罚球</small></button>
+    <button class="add-btn" data-act="score" data-side="${side}" data-pts="2">+2<small>两分球</small></button>
+    <button class="add-btn" data-act="score" data-side="${side}" data-pts="3">+3<small>三分球</small></button>
+  </div>
+  <div class="ctrl-row">
+    <button class="btn" data-act="foul" data-side="${side}">全队犯规 +1</button>
+    <button class="btn warn" data-act="timeout" data-side="${side}">请求暂停</button>
+  </div>
+  <div class="sel-note">当前计分对象：${sp?`<b>${sp.num}号 ${esc(sp.name)}</b>`:"<span>未指定（仅记入球队总分）</span>"}</div>`;
+}
+function consolePanel(){
+  const m=S.match;
+  const shotLow=m.shotMs<=5000,clkLow=m.clockMs<=30000;
+  const ot=m.period>S.rules.periods;
+  return `
+  <div class="period-chip">
+    <span>${esc(S.rules.name||"")}</span>
+    <b>${periodLabel(m.period)}</b>
+    ${ot?'<span class="badge bonus">加时</span>':""}
+  </div>
+  <div class="clock-box">
+    <div class="clock-label">比赛时钟</div>
+    <div class="clock ${clkLow?"low":""}" id="gameClock">${fmtClock(m.clockMs)}</div>
+    <div class="shot-row">
+      <div class="possession">
+        <span>球权</span>
+        <span class="arrow ${m.possession}">${m.possession==="home"?"◀":"▶"}</span>
+        <b>${esc(S[m.possession].name)}</b>
+      </div>
+      <div class="shot ${shotLow?"low":""}" id="shotClock">${S.rules.shotClockEnabled?fmtShot(m.shotMs):"--"}</div>
+    </div>
+  </div>
+  <div class="big-btns">
+    <button class="btn primary ${m.periodOver?"pulse":""}" id="btnStart" data-act="toggleClock">${m.clockRunning?"暂停计时":"开始计时"}</button>
+    <button class="btn" data-act="poss">交换球权</button>
+    <button class="btn" data-act="resetShot" data-sec="14">进攻时限 14 秒</button>
+    <button class="btn" data-act="resetClock">本节时钟归位</button>
+    <button class="btn ${m.periodOver?"primary pulse":""}" data-act="nextPeriod">进入${m.period<S.rules.periods?"下一节":"加时赛"}</button>
+  </div>`;
+}
+function rosterPanel(side){
+  const t=S[side];
+  const cards=t.players.map(p=>{
+    const cls=[S.match.selected[side]===p.id?"sel":"",p.out?"out":(p.onCourt?"":"bench")].filter(Boolean).join(" ");
+    return `<button class="pcard ${cls}" data-act="select" data-side="${side}" data-pid="${p.id}">
+      <div class="ln1"><span class="num">${p.num}</span><span class="nm">${esc(p.name)}</span></div>
+      <div class="ln2"><span>${p.pos}</span><span>得分 <b>${teamPts(p)}</b></span><span>犯规 <b>${p.pf}</b></span><span>${p.onCourt?"在场":"替补"}</span></div>
+      ${p.out?'<span class="out-tag">罚下</span>':`<span class="foul-btn" data-act="foul" data-side="${side}" data-pid="${p.id}">犯规+1</span>`}
+    </button>`;}).join("");
+  return `<div class="roster-head">
+      <h3>${esc(t.name)} · 球员模块 <span style="color:var(--muted);font-weight:400">（点击卡片选中计分对象）</span></h3>
+      <span class="hint">共 ${t.players.length} 人 · 在场 ${t.players.filter(p=>p.onCourt).length} 人</span>
+    </div>
+    <div class="plist">${cards||'<div class="empty">暂无球员，请到「规则与球队设置」中录入名单</div>'}</div>`;
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function renderScoreboard(){
+  $("#panelHome").innerHTML=teamPanel("home");
+  $("#panelAway").innerHTML=teamPanel("away");
+  $("#console").innerHTML=consolePanel();
+  $("#rosterHome").innerHTML=rosterPanel("home");
+  $("#rosterAway").innerHTML=rosterPanel("away");
+  $("#matchMeta").textContent=(S.rules.name||"自定义赛制")+" · "+periodLabel(S.match.period)+" · "+S.home.name+" "+S.match.score.home+" : "+S.match.score.away+" "+S.away.name;
+}
+function renderClocks(){
+  const g=$("#gameClock"),s=$("#shotClock");
+  if(g){g.textContent=fmtClock(S.match.clockMs);g.classList.toggle("low",S.match.clockMs<=30000);}
+  if(s&&S.rules.shotClockEnabled){s.textContent=fmtShot(S.match.shotMs);s.classList.toggle("low",S.match.shotMs<=5000);}
+  const st=$("#btnStart");
+  if(st)st.textContent=S.match.clockRunning?"暂停计时":"开始计时";
+}
+
+/* ============ 渲染：技术统计 ============ */
+function statsTable(side){
+  const t=S[side];
+  const rows=t.players.map(p=>{
+    const cls=p.out?"out-row":(p.onCourt?"":"bench-row");
+    const cells=STAT_COLS.map(([k,label])=>`<td><span class="stepper">
+        <button data-act="stat" data-side="${side}" data-pid="${p.id}" data-k="${k}" data-d="-1">−</button>
+        <span>${p[k]}</span>
+        <button data-act="stat" data-side="${side}" data-pid="${p.id}" data-k="${k}" data-d="1">+</button>
+      </span></td>`).join("");
+    return `<tr class="${cls}"><td class="name">${p.num} ${esc(p.name)}</td><td>${p.pos}</td>
+      <td style="font-weight:700">${teamPts(p)}</td>${cells}<td>${p.onCourt?"在场":(p.out?"罚下":"替补")}</td></tr>`;
+  }).join("");
+  const tot=`<tr style="background:var(--panel2);font-weight:600"><td class="name">全队合计</td><td>—</td>
+    <td>${t.players.reduce((s,p)=>s+teamPts(p),0)}</td>
+    ${STAT_COLS.map(([k])=>`<td>${t.players.reduce((s,p)=>s+p[k],0)}</td>`).join("")}<td>—</td></tr>`;
+  return `<div class="tbl-wrap">
+    <div class="tbl-head"><span>${esc(t.name)} 球员技术统计</span>
+      <span class="tot">比分 ${S.match.score[side]}　节得分 ${pScore(S.match.period)[side]}　全队犯规 ${pFouls(S.match.period)[side]}</span></div>
+    <div style="overflow:auto"><table>
+      <thead><tr><th class="name">球员</th><th>位置</th><th>得分</th>${STAT_COLS.map(([,l])=>`<th>${l}</th>`).join("")}<th>状态</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="13" class="empty">暂无球员</td></tr>'}</tbody>
+      <tfoot>${tot}</tfoot>
+    </table></div></div>`;
+}
+function renderStats(){
+  const h=$("#view-stats");
+  const hdr=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div><h3 style="margin:0">全场技术统计</h3>
+      <div class="desc" style="margin:4px 0 0">每次数据变动自动同步；可用「−/+」修正录入。得分由 2 分球 ×2 + 3 分球 ×3 + 罚球 自动计算。</div></div>
+      <button class="btn" data-act="exportCSV">导出统计表 (CSV)</button>
+    </div>`;
+  h.innerHTML=hdr+statsTable("home")+statsTable("away");
+}
+
+/* ============ 渲染：比赛记录 ============ */
+function renderLog(){
+  const items=S.match.log.map(e=>`<div class="log-item">
+      <span class="t">${esc(e.t)}</span>
+      ${e.side?`<span class="side ${e.side}">${esc(S[e.side].name)}</span>`:""}
+      <span>${esc(e.text)}</span></div>`).join("");
+  $("#view-log").innerHTML=`<div class="tbl-wrap">
+    <div class="tbl-head"><span>比赛记录 / 逐回合日志</span>
+      <span style="display:flex;gap:8px">
+        <button class="btn sm" data-act="exportJSON">导出比赛数据</button>
+        <button class="btn sm" data-act="importJSON">导入比赛数据</button>
+        <button class="btn sm danger" data-act="clearLog">清空记录</button>
+      </span></div>
+    <div class="log-list">${items||'<div class="empty">暂无记录</div>'}</div></div>`;
+}
+
+/* ============ 渲染：设置 ============ */
+function renderSettings(){
+  const presets=Object.entries(PRESETS).map(([k,v])=>
+    `<button class="preset ${S.preset===k?"active":""}" data-act="preset" data-key="${k}">${v.label}<small>${v.sub}</small></button>`).join("");
+  const ruleFields=RULE_META.map(([k,label,unit])=>
+    `<div class="field"><label>${label}（${unit}）</label>
+      <input type="number" min="0" max="999" data-rule="${k}" value="${S.rules[k]}"></div>`).join("");
+  const switches=SWITCH_META.map(([k,label])=>
+    `<div class="switch-row"><span>${label}</span><span class="sw ${S.rules[k]?"on":""}" data-act="switch" data-k="${k}"></span></div>`).join("");
+  const rosters=["home","away"].map(side=>{
+    const rows=S[side].players.map(p=>`<div class="rrow">
+        <input type="number" min="0" max="99" value="${p.num}" data-act="plNum" data-side="${side}" data-pid="${p.id}">
+        <input type="text" value="${esc(p.name)}" maxlength="12" data-act="plName" data-side="${side}" data-pid="${p.id}">
+        <select data-act="plPos" data-side="${side}" data-pid="${p.id}">
+          ${["PG","SG","SF","PF","C"].map(x=>`<option ${p.pos===x?"selected":""}>${x}</option>`).join("")}
+        </select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)">
+          <input type="checkbox" style="width:auto" ${p.onCourt?"checked":""} data-act="plCourt" data-side="${side}" data-pid="${p.id}">在场</label>
+        <button class="del" data-act="plDel" data-side="${side}" data-pid="${p.id}">×</button>
+      </div>`).join("");
+    return `<div class="card">
+      <h3>球队与名单管理 · ${side==="home"?"主队":"客队"}</h3>
+      <div class="desc">球员号码、姓名、位置均可自定义；勾选「在场」表示当前为场上球员。</div>
+      <div class="field" style="margin-bottom:12px"><label>球队名称</label>
+        <input type="text" maxlength="16" value="${esc(S[side].name)}" data-act="teamNameInput" data-side="${side}"></div>
+      <div class="rrow head"><span>号码</span><span>姓名</span><span>位置</span><span>状态</span><span></span></div>
+      ${rows}
+      <button class="btn sm" style="margin-top:8px" data-act="plAdd" data-side="${side}">+ 添加球员</button>
+    </div>`;
+  }).join("");
+  const isAdmin=currentUserRole()==="admin";
+  const acctRows=(AUTH?AUTH.users:[]).map(u=>`<tr class="acct-table">
+      <td>${esc(u.u)}${u.u===currentUser?'<span class="badge-you">当前</span>':""}</td>
+      <td>${u.role==="admin"?"管理员":"操作员"}</td>
+      <td>${new Date(u.created||Date.now()).toLocaleDateString("zh-CN")}</td>
+      <td>${isAdmin&&AUTH.users.length>1&&u.u!==currentUser
+        ?`<button class="btn sm danger" data-act="authDel" data-u="${esc(u.u)}">删除</button>`:"—"}</td>
+    </tr>`).join("");
+  const userOpts=(AUTH?AUTH.users:[])
+    .filter(u=>isAdmin||u.u===currentUser)
+    .map(u=>`<option value="${esc(u.u)}" ${u.u===currentUser?"selected":""}>${esc(u.u)}</option>`).join("");
+  const authCard=`<div class="card">
+    <h3>登录账号管理</h3>
+    <div class="desc">当前登录：${esc(currentUser||"—")}${currentUser?"（"+(isAdmin?"管理员":"操作员")+"）":""}。密码以加盐散列保存在本机浏览器，导出的比赛数据不包含账号信息。账号角色：管理员可增删账号、重置任意密码；操作员仅可修改自己的密码。</div>
+    <table style="margin:10px 0 14px"><thead><tr><th>用户名</th><th>角色</th><th>创建日期</th><th>操作</th></tr></thead><tbody>${acctRows}</tbody></table>
+    ${isAdmin?`
+    <div class="field-grid" style="grid-template-columns:1fr 1fr auto;align-items:end">
+      <div class="field"><label>添加账号 · 用户名</label><input type="text" id="authNewUser" maxlength="16" placeholder="2-16 位"></div>
+      <div class="field"><label>密码（至少 4 位）</label><input type="password" id="authNewPw" placeholder="初始密码"></div>
+      <button class="btn primary" data-act="authAdd">+ 添加账号</button>
+    </div>`:""}
+    <div class="field-grid" style="grid-template-columns:1fr 1fr 1fr auto;align-items:end;margin-top:10px">
+      <div class="field"><label>修改密码 · 账号</label><select id="authSelUser">${userOpts}</select></div>
+      <div class="field"><label>原密码${isAdmin?"（管理员可留空）":""}</label><input type="password" id="authOldPw" placeholder="原密码"></div>
+      <div class="field"><label>新密码（至少 4 位）</label><input type="password" id="authNewPw2" placeholder="新密码"></div>
+      <button class="btn" data-act="authChpw">修改密码</button>
+    </div>
+  </div>`;
+  $("#view-settings").innerHTML=`
+    <div class="card">
+      <h3>赛制预设</h3>
+      <div class="desc">一键套用主流赛制的标准参数，套用后仍可继续逐项微调。</div>
+      <div class="presets">${presets}</div>
+    </div>
+    <div class="card">
+      <h3>规则参数自定义（管理员）</h3>
+      <div class="desc">修改后立即生效；若比赛尚未开始、或本节时钟尚未走动，比赛时钟与进攻时限会同步刷新为新的时长。</div>
+      <div class="field-grid">${ruleFields}
+        <div class="field"><label>大屏赛事标题（显示在大屏最顶部）</label>
+          <input type="text" maxlength="30" placeholder="例：2025-2026赛季城市篮球联赛" data-rule-text="eventName" value="${esc(S.rules.eventName||"")}"></div>
+      </div>
+      <div style="margin-top:16px">${switches}</div>
+    </div>
+    <div class="card">
+      <h3>大屏显示页（独立网页）</h3>
+      <div class="desc">计分台顶部「打开大屏显示」会弹出独立窗口，该页面只显示比分、时钟、进攻时限、犯规与暂停，适合拖到投影屏全屏播放。它通过本机数据通道自动跟随计分台实时更新，无需手动刷新。</div>
+      <div class="tools">
+        <a class="btn primary" href="display.html" target="_blank" style="display:inline-block;text-decoration:none">在新标签页打开大屏显示页</a>
+        <button class="btn" data-act="openDisplay">弹出独立窗口（推荐）</button>
+      </div>
+      <div class="desc" style="margin:12px 0 0">若浏览器拦截弹窗，请允许本站弹出窗口，或直接使用左侧的在新标签页打开方式。大屏页内：<b>F</b> 全屏 · <b>D</b> 切换深浅色 · <b>+</b> / <b>-</b> 调整字号。</div>
+    </div>
+    <div class="card">
+      <h3>数据与比赛控制</h3>
+      <div class="desc">所有数据保存在本机浏览器中，可导出为文件备份或迁移到其他设备。</div>
+      <div class="tools">
+        <button class="btn" data-act="exportJSON">导出比赛数据 (JSON)</button>
+        <button class="btn" data-act="importJSON">导入比赛数据</button>
+        <button class="btn" data-act="exportCSV">导出技术统计 (CSV)</button>
+        <button class="btn warn" data-act="restartMatch">重新开始本场比赛</button>
+        <button class="btn danger" data-act="factoryReset">恢复出厂设置</button>
+      </div>
+    </div>
+    <div class="grid2">${rosters}</div>
+    ${authCard}`;
+}
+
+/* ============ 渲染：规则说明 ============ */
+function renderHelp(){
+  $("#view-help").innerHTML=`
+  <div class="card">
+    <h3>模块清单</h3>
+    <div class="desc">系统按比赛现场的实际工作流拆分为 11 个模块，每个模块的参数都能在「规则与球队设置」中由管理员自定义。</div>
+    <table>
+      <thead><tr><th>模块</th><th>职责</th><th>可自定义项</th></tr></thead>
+      <tbody>
+        <tr><td>① 比赛时钟</td><td>节次倒计时、开始/暂停、节间切换</td><td>节数、每节时长、加时时长</td></tr>
+        <tr><td>② 进攻时限</td><td>24 秒倒计时与自动违例判定</td><td>时限秒数、是否启用、14 秒重置</td></tr>
+        <tr><td>③ 比分</td><td>1/2/3 分累加、按节统计、误操作更正</td><td>记分对象（球队/球员）</td></tr>
+        <tr><td>④ 犯规</td><td>个人犯规、全队犯规、处罚状态、犯满离场</td><td>离场次数、处罚阈值、是否启用</td></tr>
+        <tr><td>⑤ 暂停</td><td>按上/下半场分别限次与计时</td><td>各节段次数、每次时长</td></tr>
+        <tr><td>⑥ 球队与球员</td><td>名单、号码、位置、首发/替补、换人</td><td>全部可自由增删改</td></tr>
+        <tr><td>⑦ 技术统计</td><td>2 分/3 分/罚球/篮板/助攻/抢断/盖帽/失误/犯规</td><td>逐项可修正，支持导出</td></tr>
+        <tr><td>⑧ 比赛记录</td><td>带比赛时间的逐回合日志与一键撤销</td><td>可清空、可导出</td></tr>
+        <tr><td>⑨ 数据存储</td><td>本地自动保存、JSON 导入导出</td><td>重新开始/恢复出厂</td></tr>
+        <tr><td>⑩ 大屏显示页</td><td>独立网页只显示比分、时钟、犯规、暂停，供投影播放</td><td>字号缩放、深浅色、全屏</td></tr>
+        <tr><td>⑪ 登录与账号</td><td>口令保护操作台，账号分管理员/操作员两种角色</td><td>账号增删、密码修改、会话管理</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>内置标准规则要点（以 FIBA 为例）</h3>
+    <p style="font-size:13px;color:var(--muted)">默认预设按国际篮联现行规则：<b>4 节 × 10 分钟</b>，节间休息，打平进入 <b>5 分钟加时赛</b>。第 1、2 节为上半场，第 3、4 节为下半场。</p>
+    <ul>
+      <li><b>得分：</b>三分线外命中 3 分，线内命中 2 分，罚球命中 1 分。</li>
+      <li><b>进攻时限：</b>每次进攻须在 24 秒内出手并触及篮圈；后场推进至前场限 8 秒；前场获得球权且剩余不足 14 秒时重置为 14 秒。</li>
+      <li><b>个人犯规：</b>累计 5 次即罚出场外，不得再上场。（NBA 预设为 6 次）</li>
+      <li><b>全队犯规处罚：</b>单节全队累计第 5 次犯规起进入处罚状态（BONUS），此后对非投篮动作的犯规，对方获得 2 次罚球。</li>
+      <li><b>暂停：</b>上半场 2 次、下半场 3 次，每次 60 秒，加时赛 1 次，且仅持球方或死球时方可请求。</li>
+      <li><b>其他常见违例：</b>3 秒区停留超 3 秒、5 秒发球/紧逼、8 秒未过半场、走步、二次运球等，由裁判判罚后在「比赛记录」模块登记。</li>
+    </ul>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:10px">三人篮球（3x3）预设为 1 节 10 分钟、12 秒进攻时限、21 分制，全队第 7 次犯规起对方获得 2 次罚球。NBA 预设为 4 节 × 12 分钟、6 犯离场。</p>
+  </div>
+  <div class="card">
+    <h3>操作提示</h3>
+    <ul>
+      <li>空格键 = 开始 / 暂停比赛时钟。</li>
+      <li>先在下方球员卡片中点选球员，再点 +1/+2/+3，得分会同时记入该球员技术统计；未选球员则只累加球队总分。</li>
+      <li>记错时可点分数两侧的「−」更正，或点右上角「撤销上一步」回滚整个操作。</li>
+      <li>点击顶部「打开大屏显示」会弹出独立窗口 <b>display.html</b>，该页面只显示比分与时钟，拖到投影屏后按 <b>F</b> 键即可全屏；计分台的一切操作都会实时同步过去。若弹窗被拦截，可在「规则与球队设置」中手动打开大屏页。</li>
+    </ul>
+  </div>`;
+}
+
+/* ============ 数据导出 / 导入 ============ */
+function download(name,text,type){
+  const blob=new Blob([type&&type.indexOf("csv")>=0?"\ufeff"+text:text],{type:type||"application/json;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function exportJSON(){
+  download("basketball-match-"+stamp()+".json",JSON.stringify(S,null,2));
+  toast("已导出比赛数据");
+}
+function exportCSV(){
+  const lines=[["球队","号码","姓名","位置","得分","2分","3分","罚球","篮板","助攻","抢断","盖帽","失误","犯规","状态"]];
+  ["home","away"].forEach(side=>S[side].players.forEach(p=>{
+    lines.push([S[side].name,p.num,p.name,p.pos,teamPts(p),p.fgm2,p.fgm3,p.ftm,p.reb,p.ast,p.stl,p.blk,p.tov,p.pf,p.onCourt?"在场":(p.out?"罚下":"替补")]);
+  }));
+  ["home","away"].forEach(side=>lines.push([S[side].name,"-","全队合计","-",S.match.score[side],
+    S[side].players.reduce((s,p)=>s+p.fgm2,0),S[side].players.reduce((s,p)=>s+p.fgm3,0),S[side].players.reduce((s,p)=>s+p.ftm,0),
+    S[side].players.reduce((s,p)=>s+p.reb,0),S[side].players.reduce((s,p)=>s+p.ast,0),S[side].players.reduce((s,p)=>s+p.stl,0),
+    S[side].players.reduce((s,p)=>s+p.blk,0),S[side].players.reduce((s,p)=>s+p.tov,0),S[side].players.reduce((s,p)=>s+p.pf,0),
+    "全队犯规 "+pFouls(S.match.period)[side]+" 次"]));
+  download("basketball-stats-"+stamp()+".csv",lines.map(r=>r.join(",")).join("\r\n"),"text/csv;charset=utf-8");
+  toast("已导出技术统计 CSV");
+}
+function stamp(){const d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"-"+pad(d.getHours())+pad(d.getMinutes());}
+function importJSON(){
+  const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    const fr=new FileReader();
+    fr.onload=()=>{try{const d=JSON.parse(fr.result);
+      if(!d.rules||!d.match||!d.home||!d.away)throw new Error("格式不正确");
+      snapshot();const theme=S.theme;S=d;S.theme=theme;
+      document.body.className=theme==="dark"?"":"light";
+      renderAll();save();toast("导入成功");
+    }catch(e){toast("导入失败："+e.message);}};
+    fr.readAsText(f,"utf-8");};
+  inp.click();
+}
+
+/* ============ 渲染总入口 ============ */
+function renderAll(){
+  renderScoreboard();renderStats();renderLog();renderSettings();renderHelp();
+  $("#saveHint").textContent="自动保存已开启";
+  updateThemeBtn();
+  publish();
+}
+function updateThemeBtn(){
+  const b=$("#btnTheme");if(b)b.textContent=S.theme==="dark"?"浅色":"深色";
+}
+function setTheme(t){
+  S.theme=t;document.body.className=t==="dark"?"":"light";
+  updateThemeBtn();save();
+}
+
+/* ============ 事件绑定（全局委托） ============ */
+document.addEventListener("click",async ev=>{
+  const tab=ev.target.closest(".tab");
+  if(tab){
+    $$(".tab").forEach(t=>t.classList.toggle("active",t===tab));
+    $$(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+tab.dataset.view));
+    return;
+  }
+  const el=ev.target.closest("[data-act]");
+  if(!el)return;
+  const act=el.dataset.act,side=el.dataset.side,pid=el.dataset.pid;
+  switch(act){
+    case "score":addScore(side,Number(el.dataset.pts));break;
+    case "sub":subScore(side,Number(el.dataset.pts));break;
+    case "foul":
+      ev.stopPropagation();
+      addFoul(side,pid||S.match.selected[side]);
+      break;
+    case "timeout":useTimeout(side);break;
+    case "select":{
+      S.match.selected[side]=S.match.selected[side]===pid?null:pid;
+      renderScoreboard();renderStats();save();break;}
+    case "toggleClock":toggleClock();break;
+    case "poss":switchPossession();break;
+    case "resetShot":resetShot(Number(el.dataset.sec)||S.rules.shotClock);
+      logEvent("进攻时限重置为 "+(el.dataset.sec||S.rules.shotClock)+" 秒","");break;
+    case "resetClock":{
+      snapshot();
+      const mins=S.match.period<=S.rules.periods?S.rules.periodMinutes:S.rules.overtimeMinutes;
+      setClock(mins*60000);S.match.clockRunning=false;S.match.periodOver=false;
+      logEvent("本节比赛时钟归位为 "+mins+" 分钟","");renderAll();save();break;}
+    case "nextPeriod":nextPeriod();break;
+    case "stat":{
+      const p=findP(side,pid);if(!p)break;
+      const k=el.dataset.k,d=Number(el.dataset.d);
+      if(k==="pf"&&d>0){addFoul(side,pid);break;}
+      snapshot();p[k]=Math.max(0,p[k]+d);renderAll();save();break;}
+    case "preset":applyPreset(el.dataset.key);break;
+    case "switch":{
+      const k=el.dataset.k;snapshot();S.rules[k]=!S.rules[k];
+      if(!S.match.started&&k==="shotClockEnabled")S.match.shotMs=S.rules.shotClock*1000;
+      renderAll();save();break;}
+    case "plAdd":{
+      snapshot();
+      S[side].players.push({id:nid(),num:(S[side].players.length+4),name:"球员"+(S[side].players.length+1),pos:"SF",onCourt:false,...ZERO()});
+      renderAll();save();break;}
+    case "plDel":{
+      snapshot();
+      S[side].players=S[side].players.filter(p=>p.id!==pid);
+      renderAll();save();break;}
+    case "exportJSON":exportJSON();break;
+    case "exportCSV":exportCSV();break;
+    case "importJSON":importJSON();break;
+    case "clearLog":if(confirm("确定清空比赛记录吗？比分与统计不受影响。")){snapshot();S.match.log=[];renderAll();save();}break;
+    case "openDisplay":openDisplay();break;
+    case "logout":logout();break;
+    case "authAdd":{
+      if(currentUserRole()!=="admin"){toast("仅管理员可添加账号");break;}
+      const un=($("#authNewUser").value||"").trim(),pw=$("#authNewPw").value||"";
+      if(!un){toast("请输入用户名");break;}
+      if(!/^[A-Za-z0-9_\u4e00-\u9fa5]{2,16}$/.test(un)){toast("用户名需 2-16 位（中文/字母/数字/下划线）");break;}
+      if(pw.length<4){toast("密码至少 4 位");break;}
+      if(AUTH.users.some(u=>u.u===un)){toast("该用户名已存在");break;}
+      const salt=randSalt();
+      AUTH.users.push({u:un,role:"operator",salt,hash:await pwHash(pw,salt),created:Date.now()});
+      saveAuth();$("#authNewUser").value="";$("#authNewPw").value="";
+      renderSettings();toast("已添加账号："+un);break;}
+    case "authDel":{
+      if(currentUserRole()!=="admin"){toast("仅管理员可删除账号");break;}
+      const u=el.dataset.u;
+      if(u===currentUser){toast("不能删除当前登录的账号");break;}
+      if(AUTH.users.length<=1){toast("至少需要保留一个账号");break;}
+      if(!confirm("确定删除账号「"+u+"」吗？该操作不可撤销。"))break;
+      AUTH.users=AUTH.users.filter(x=>x.u!==u);
+      saveAuth();renderSettings();toast("已删除账号："+u);break;}
+    case "authChpw":{
+      const target=$("#authSelUser")?$("#authSelUser").value:"";
+      const np=$("#authNewPw2").value||"",op=$("#authOldPw").value||"";
+      const rec=AUTH.users.find(u=>u.u===target);
+      if(!rec){toast("请选择要修改的账号");break;}
+      if(np.length<4){toast("新密码至少 4 位");break;}
+      if(target===currentUser&&currentUserRole()!=="admin"){
+        if(!op){toast("请输入原密码");break;}
+        if(await pwHash(op,rec.salt)!==rec.hash){toast("原密码不正确");break;}
+      }
+      rec.salt=randSalt();rec.hash=await pwHash(np,rec.salt);
+      saveAuth();$("#authNewPw2").value="";$("#authOldPw").value="";
+      toast("密码已更新："+target);break;}
+    case "restartMatch":newMatch(true);break;
+    case "factoryReset":newMatch(false);break;
+  }
+});
+document.addEventListener("change",ev=>{
+  const el=ev.target.closest("[data-act],[data-rule],[data-rule-text]");
+  if(!el)return;
+  if(el.dataset.ruleText){
+    snapshot();S.rules[el.dataset.ruleText]=el.value.trim();S.preset="custom";
+    renderAll();save();return;
+  }
+  if(el.dataset.rule){
+    const k=el.dataset.rule;let v=parseInt(el.value,10);
+    if(isNaN(v)||v<0)v=0;
+    snapshot();
+    const oldFull=(S.match.period<=S.rules.periods?S.rules.periodMinutes:S.rules.overtimeMinutes)*60000;
+    const wasFresh=Math.abs(S.match.clockMs-oldFull)<1500&&!S.match.clockRunning;
+    S.rules[k]=v;S.preset="custom";
+    const newFull=(S.match.period<=S.rules.periods?S.rules.periodMinutes:S.rules.overtimeMinutes)*60000;
+    if(!S.match.started||wasFresh)S.match.clockMs=newFull;
+    if(!S.match.started||wasFresh)S.match.shotMs=S.rules.shotClock*1000;
+    renderAll();save();return;
+  }
+  const act=el.dataset.act,side=el.dataset.side,pid=el.dataset.pid;
+  if(act==="teamName"){S[side].name=el.value||(side==="home"?"主队":"客队");renderAll();save();}
+  else if(act==="teamNameInput"){S[side].name=el.value||(side==="home"?"主队":"客队");renderAll();save();}
+  else if(act==="plName"){const p=findP(side,pid);if(p){p.name=el.value;renderAll();save();}}
+  else if(act==="plNum"){const p=findP(side,pid);if(p){p.num=parseInt(el.value,10)||0;renderAll();save();}}
+  else if(act==="plPos"){const p=findP(side,pid);if(p){p.pos=el.value;save();}}
+  else if(act==="plCourt"){const p=findP(side,pid);if(p){p.onCourt=el.checked;renderAll();save();}}
+});
+document.addEventListener("keydown",ev=>{
+  if(document.body.classList.contains("locked"))return;
+  const tag=(ev.target.tagName||"").toLowerCase();
+  if(tag==="input"||tag==="select"||tag==="textarea")return;
+  if(ev.code==="Space"){ev.preventDefault();toggleClock();}
+  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==="z"){ev.preventDefault();undo();}
+});
+$("#btnUndo").addEventListener("click",undo);
+$("#btnTheme").addEventListener("click",()=>setTheme(S.theme==="dark"?"light":"dark"));
+$("#btnBig").addEventListener("click",openDisplay);
+$("#btnBigExit").addEventListener("click",()=>{document.body.classList.remove("bigscreen");});
+
+/* ============ 登录与账号管理 ============ */
+const LS_AUTH="bball-auth-v1",SS_SESSION="bball-session-v1";
+let AUTH=null,currentUser=null;
+function randSalt(){
+  const a=new Uint8Array(8);
+  if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(a);
+  else for(let i=0;i<8;i++)a[i]=Math.floor(Math.random()*256);
+  return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function pwHash(pw,salt){
+  const msg=salt+"::"+pw;
+  try{
+    if(window.crypto&&crypto.subtle){
+      const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(msg));
+      return "sha256:"+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+  }catch(e){}
+  let h=5381;
+  for(let i=0;i<msg.length;i++)h=((h<<5)+h+msg.charCodeAt(i))>>>0;
+  return "djb2:"+h.toString(16);
+}
+function loadAuth(){
+  try{const d=JSON.parse(localStorage.getItem(LS_AUTH));
+    if(d&&Array.isArray(d.users)&&d.users.length)return d;}catch(e){}
+  return null;
+}
+function saveAuth(){try{localStorage.setItem(LS_AUTH,JSON.stringify(AUTH));}catch(e){}}
+async function seedAuth(){
+  const salt=randSalt();
+  const d={users:[{u:"admin",role:"admin",salt,hash:await pwHash("admin123",salt),created:Date.now()}]};
+  try{localStorage.setItem(LS_AUTH,JSON.stringify(d));}catch(e){}
+  return d;
+}
+function currentUserRole(){
+  const u=AUTH&&AUTH.users.find(x=>x.u===currentUser);
+  return u?u.role:"";
+}
+function lockUI(){
+  document.body.classList.add("locked");
+  $("#loginGate").classList.remove("hide");
+  $("#userChip").textContent="";
+  const first=AUTH.users.length===1&&AUTH.users[0].u==="admin";
+  $("#loginHint").textContent=first
+    ?"首次使用默认账号：admin / admin123，登录后请到「规则与球队设置 → 登录账号管理」修改密码。"
+    :"账号由管理员在「规则与球队设置 → 登录账号管理」中维护。";
+  setTimeout(()=>{try{$("#loginUser").focus();}catch(e){}},60);
+}
+function unlockUI(){
+  document.body.classList.remove("locked");
+  $("#loginGate").classList.add("hide");
+  $("#userChip").textContent="用户："+currentUser+(currentUserRole()==="admin"?" · 管理员":" · 操作员");
+  renderSettings();
+}
+$("#loginForm").addEventListener("submit",async ev=>{
+  ev.preventDefault();
+  const un=$("#loginUser").value.trim(),pw=$("#loginPw").value;
+  const rec=AUTH.users.find(u=>u.u===un);
+  if(!rec||await pwHash(pw,rec.salt)!==rec.hash){
+    $("#loginErr").textContent="用户名或密码不正确";
+    const c=$("#loginCard");c.classList.add("shake");setTimeout(()=>c.classList.remove("shake"),400);
+    $("#loginPw").value="";$("#loginPw").focus();
+    return;
+  }
+  currentUser=un;
+  try{sessionStorage.setItem(SS_SESSION,un);}catch(e){}
+  $("#loginPw").value="";$("#loginErr").textContent="";
+  unlockUI();toast("欢迎，"+un);
+});
+function logout(){
+  currentUser=null;
+  try{sessionStorage.removeItem(SS_SESSION);}catch(e){}
+  lockUI();
+}
+
+/* ============ 启动 ============ */
+(async function boot(){
+  AUTH=loadAuth()||await seedAuth();
+  document.body.className=S.theme==="dark"?"":"light";
+  renderAll();
+  let sess=null;
+  try{sess=sessionStorage.getItem(SS_SESSION);}catch(e){}
+  if(sess&&AUTH.users.some(u=>u.u===sess)){currentUser=sess;unlockUI();}
+  else lockUI();
+})();
+</script>
+</body>
+</html>

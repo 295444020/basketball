@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>大屏计分显示 · 篮球比赛</title>
+<style>
+:root{
+  --page:#0b0d12;--frame:#15181f;
+  --led-bg:#000;--led-line:#191919;
+  --red:#ff3b30;--amber:#ffb000;--yellow:#ffd21f;--green:#3ddc84;
+  --name:#e9f1ff;--num:#ff8a80;--muted:#8ba0bd;--muted2:#5c6b82;
+  --scale:1;
+}
+body.light{--page:#c9d2e0;--frame:#dfe5ef;--muted:#3d4a5f}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--page);color:var(--name);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  display:flex;flex-direction:column;
+}
+.screen{flex:1;display:flex;flex-direction:column;min-height:0;padding:1vh 1vw 1.2vh;position:relative}
+
+/* ---------- 顶部信息条 ---------- */
+.hud{
+  display:flex;align-items:center;gap:12px;padding:.4vh .4vw .9vh;
+  font-size:calc(1.05vw * var(--scale));color:var(--muted);
+  flex:none;opacity:.3;transition:opacity .25s;
+}
+.hud:hover{opacity:1}
+.hud .dot{display:inline-flex;align-items:center;gap:.5em;font-size:.95em}
+.hud .dot::before{content:"";width:.6em;height:.6em;border-radius:50%;background:var(--muted2)}
+.hud .dot.live::before{background:var(--green)}
+.hud .dot.stale::before{background:var(--amber)}
+.spacer{flex:1}
+.hud button{
+  background:#161a22;border:1px solid #2a3140;color:#c9d6ea;
+  border-radius:8px;padding:.4em 1em;font-size:.95em;cursor:pointer;
+  font-family:inherit;transition:.15s;white-space:nowrap;
+}
+.hud button:hover{border-color:#5b6b82;color:#fff}
+.hud button.on{border-color:var(--amber);color:var(--amber)}
+
+/* ---------- LED 大屏 ---------- */
+.led{
+  flex:1;min-height:0;background:var(--led-bg);border-radius:1.4vh;
+  border:.55vh solid var(--frame);
+  display:flex;flex-direction:column;
+  box-shadow:0 1.4vh 4vh rgba(0,0,0,.55);
+  padding:1.2vh 1.4vw;
+  min-width:0;
+}
+.evname{
+  text-align:center;color:var(--red);letter-spacing:.14em;
+  font-size:calc(2.6vh * var(--scale));font-weight:600;
+  text-shadow:0 0 .5em rgba(255,59,48,.55);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;
+}
+.teams{
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  gap:1vw;margin:.7vh 0 .4vh;flex:none;
+}
+.tname{
+  text-align:center;color:var(--yellow);font-weight:600;
+  font-size:calc(3.2vh * var(--scale));letter-spacing:.06em;
+  text-shadow:0 0 .45em rgba(255,210,31,.45);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.vsblock{text-align:center;line-height:1.15;min-width:14ch}
+.vs{color:#fff;font-size:calc(2.2vh * var(--scale));letter-spacing:.2em;font-weight:600}
+.period{
+  color:var(--yellow);font-size:calc(2.8vh * var(--scale));font-weight:700;letter-spacing:.1em;
+  text-shadow:0 0 .45em rgba(255,210,31,.45);
+}
+.period.ot{color:var(--red)}
+
+/* ---------- 主区 ---------- */
+.main{
+  flex:1;min-height:0;display:grid;
+  grid-template-columns:1fr minmax(30ch,34vw) 1fr;gap:1vw;
+}
+.roster{
+  display:flex;flex-direction:column;justify-content:center;gap:.35vh;min-height:0;overflow:hidden;
+  padding:.6vh .2vw;
+}
+.prow{
+  display:grid;grid-template-columns:3.2ch 1fr auto 5ch;
+  align-items:center;gap:.7vw;
+  font-size:calc(2.15vh * var(--scale));line-height:1.25;
+  border-bottom:1px solid rgba(255,255,255,.055);padding:.18vh .2vw;
+}
+.prow .pnum{color:var(--num);font-family:ui-monospace,Consolas,monospace;text-align:right}
+.prow .pname{color:var(--name);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .ppts{
+  color:var(--green);text-align:right;font-family:ui-monospace,Consolas,monospace;
+  font-weight:700;font-variant-numeric:tabular-nums;
+  text-shadow:0 0 .4em rgba(61,220,132,.4);
+}
+.prow .dots{display:inline-flex;gap:.28em;align-items:center}
+.prow .dots i{
+  width:.62em;height:.62em;border-radius:50%;display:inline-block;
+  border:1px solid rgba(255,210,31,.5);
+}
+.prow .dots i.on{background:var(--yellow);border-color:var(--yellow);box-shadow:0 0 .3em rgba(255,210,31,.6)}
+.prow.bench{opacity:.42}
+.prow.gone .pname,.prow.gone .ppts,.prow.gone .pnum{color:var(--red);text-decoration:line-through}
+.prow.gone .dots{display:none}
+.prow.empty{grid-template-columns:1fr;color:var(--muted2);justify-items:center}
+
+/* ---------- 中央比分 ---------- */
+.midled{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.9vh;min-height:0;
+}
+.bigscore{
+  display:flex;align-items:baseline;gap:.35em;
+  font-family:ui-monospace,Consolas,"Courier New",monospace;font-variant-numeric:tabular-nums;
+  color:var(--amber);font-weight:700;line-height:.95;letter-spacing:.02em;
+  text-shadow:0 0 .55em rgba(255,176,0,.5);
+  font-size:calc(min(17vh,11vw) * var(--scale));
+}
+.bigscore .colon{color:rgba(255,176,0,.75)}
+.clockrow{display:flex;align-items:center;gap:1.4vw}
+.clock{
+  font-family:ui-monospace,Consolas,"Courier New",monospace;font-variant-numeric:tabular-nums;
+  color:var(--red);font-weight:700;letter-spacing:.04em;line-height:1;
+  text-shadow:0 0 .5em rgba(255,59,48,.55);
+  font-size:calc(min(9vh,6.5vw) * var(--scale));
+}
+.clock.low{color:#ff5f57}
+.clock.done{color:var(--yellow)}
+.clock-flash{animation:flash .6s ease-in-out 4}
+@keyframes flash{50%{opacity:.12}}
+.shotmini{
+  display:flex;flex-direction:column;align-items:center;line-height:1;
+  border:1px solid rgba(255,176,0,.4);border-radius:.9vh;padding:.5vh 1vw;
+}
+.shotmini .lbl{font-size:calc(1.35vh * var(--scale));letter-spacing:.22em;color:var(--amber);opacity:.85}
+.shotmini .val{
+  font-family:ui-monospace,Consolas,monospace;color:var(--amber);font-weight:700;
+  font-size:calc(4.6vh * var(--scale));font-variant-numeric:tabular-nums;
+  text-shadow:0 0 .4em rgba(255,176,0,.5);
+}
+.shotmini .val.low{color:var(--red)}
+.shotmini.off{opacity:.35}
+.pauseline{display:flex;align-items:center;gap:1vw;margin-top:.4vh}
+.blocks{display:inline-flex;gap:.45em}
+.blocks i{
+  width:1.5em;height:.62em;border-radius:.12em;display:inline-block;
+  background:rgba(255,59,48,.18);border:1px solid rgba(255,59,48,.45);
+}
+.blocks i.on{background:var(--red);border-color:var(--red);box-shadow:0 0 .35em rgba(255,59,48,.7)}
+.pauselbl{
+  color:var(--yellow);font-size:calc(2.1vh * var(--scale));letter-spacing:.5em;font-weight:600;
+  text-indent:.5em;text-shadow:0 0 .4em rgba(255,210,31,.4);
+}
+
+/* ---------- 底部 ---------- */
+.footer{
+  flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  gap:1vw;margin-top:.7vh;padding-top:.7vh;border-top:1px solid var(--led-line);
+}
+.fcell{display:flex;align-items:center;gap:.9vw;font-size:calc(2.3vh * var(--scale))}
+.fcell.right{justify-content:flex-end}
+.flbl{color:var(--name);letter-spacing:.14em;font-weight:600}
+.fnum{
+  color:var(--yellow);font-family:ui-monospace,Consolas,monospace;font-weight:700;
+  font-size:1.25em;text-shadow:0 0 .4em rgba(255,210,31,.45);font-variant-numeric:tabular-nums;
+}
+.bt{
+  display:none;background:var(--red);color:#fff;font-weight:700;letter-spacing:.08em;
+  border-radius:.4em;padding:.12em .7em;font-size:.82em;
+  box-shadow:0 0 .5em rgba(255,59,48,.6);
+}
+.bt.on{display:inline-block}
+.poss{
+  display:inline-flex;align-items:center;gap:.45em;color:var(--yellow);font-weight:600;
+  letter-spacing:.08em;font-size:calc(2.1vh * var(--scale));
+}
+.poss .ar{font-size:1.2em;line-height:1}
+.poss.home{color:var(--yellow)}
+.poss.away{color:#7cc4ff}
+
+/* ---------- 提示层 ---------- */
+.overlay{
+  position:absolute;inset:0;background:rgba(3,4,6,.9);display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:1.5vh;
+  text-align:center;padding:4vw;z-index:5;
+}
+.overlay h2{font-size:calc(3.2vh * var(--scale));font-weight:600}
+.overlay p{font-size:calc(2vh * var(--scale));color:var(--muted);line-height:1.8;max-width:46ch}
+.overlay.hide{display:none}
+kbd{
+  font-family:inherit;background:#161a22;border:1px solid #2a3140;
+  border-radius:6px;padding:.1em .6em;font-size:.95em;color:#c9d6ea;
+}
+</style>
+</head>
+<body>
+<div class="screen" id="screen">
+
+  <div class="hud" id="hud">
+    <span class="dot stale" id="connState">等待计分台数据</span>
+    <span class="spacer"></span>
+    <button id="btnScaleDown">缩小</button>
+    <button id="btnScaleUp">放大</button>
+    <button id="btnTheme">浅色</button>
+    <button id="btnDemo">演示</button>
+    <button id="btnFs">全屏</button>
+  </div>
+
+  <div class="led" id="led">
+    <div class="evname" id="eventName">篮球比赛</div>
+
+    <div class="teams">
+      <div class="tname home" id="nameHome">主队</div>
+      <div class="vsblock">
+        <div class="vs">VS</div>
+        <div class="period" id="periodChip">第 1 节</div>
+      </div>
+      <div class="tname away" id="nameAway">客队</div>
+    </div>
+
+    <div class="main">
+      <div class="roster" id="rosterHome"></div>
+      <div class="midled">
+        <div class="bigscore">
+          <span id="scoreHome">0</span><span class="colon">:</span><span id="scoreAway">0</span>
+        </div>
+        <div class="clockrow">
+          <div class="clock" id="clock">10:00.0</div>
+          <div class="shotmini" id="shotBox">
+            <span class="lbl">进攻时限</span>
+            <span class="val" id="shot">24</span>
+          </div>
+        </div>
+        <div class="pauseline">
+          <span class="blocks" id="toHome"></span>
+          <span class="pauselbl">暂停</span>
+          <span class="blocks" id="toAway"></span>
+        </div>
+      </div>
+      <div class="roster" id="rosterAway"></div>
+    </div>
+
+    <div class="footer">
+      <div class="fcell">
+        <span class="fnum" id="foulHome">0</span><span class="flbl">累计犯规</span>
+        <span class="bt" id="bonusHome">BONUS 处罚</span>
+      </div>
+      <div class="fcell">
+        <span class="poss home" id="poss"><span class="ar">◀</span><span id="possName">主队球权</span></span>
+      </div>
+      <div class="fcell right">
+        <span class="bt" id="bonusAway">BONUS 处罚</span>
+        <span class="flbl">累计犯规</span><span class="fnum" id="foulAway">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <h2>等待计分台数据</h2>
+    <p>请保持计分台页面处于打开状态。在计分台点击「打开大屏显示」可重新打开本页面；本页会自动跟随计分台实时更新，无需手动刷新。</p>
+    <p>按 <kbd>F</kbd> 全屏 · 按 <kbd>D</kbd> 切换深浅色 · 按 <kbd>+</kbd> / <kbd>-</kbd> 调整字号 · 按 <kbd>P</kbd> 演示模式</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const LS_LIVE="bball-display-v1",LS_STATE="bball-scoreboard-v1",LS_PREF="bball-display-pref";
+const $=s=>document.querySelector(s);
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+let LIVE=null,baseTs=0,baseClock=0,baseShot=0,demo=false,lastRecv=0,prevClock=null;
+
+/* ---------- 偏好（主题 / 缩放） ---------- */
+let pref={theme:"dark",scale:1};
+try{const raw=localStorage.getItem(LS_PREF);if(raw)pref=Object.assign(pref,JSON.parse(raw));}catch(e){}
+function savePref(){try{localStorage.setItem(LS_PREF,JSON.stringify(pref));}catch(e){}}
+function applyPref(){
+  document.body.className=pref.theme==="light"?"light":"";
+  document.documentElement.style.setProperty("--scale",pref.scale.toFixed(2));
+  $("#btnTheme").textContent=pref.theme==="light"?"深色":"浅色";
+}
+function nudgeScale(d){
+  pref.scale=Math.min(1.6,Math.max(0.65,Math.round((pref.scale+d)*10)/10));
+  applyPref();savePref();
+}
+$("#btnTheme").onclick=()=>{pref.theme=pref.theme==="light"?"dark":"light";applyPref();savePref();};
+$("#btnScaleUp").onclick=()=>nudgeScale(0.1);
+$("#btnScaleDown").onclick=()=>nudgeScale(-0.1);
+$("#btnFs").onclick=()=>{
+  if(document.fullscreenElement)document.exitFullscreen();
+  else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();
+};
+$("#btnDemo").onclick=()=>{
+  demo=!demo;
+  $("#btnDemo").classList.toggle("on",demo);
+  if(demo){apply(demoPayload());lastRecv=Date.now();}
+  else{const p=loadMirror();if(p)apply(p);else{LIVE=null;showOverlay(true);}}
+};
+
+/* ---------- 数据接收 ---------- */
+let chan=null;
+try{chan=new BroadcastChannel("bball-scoreboard-live");chan.onmessage=e=>receive(e.data);}catch(e){}
+window.addEventListener("storage",e=>{
+  if(e.key===LS_LIVE&&e.newValue){try{receive(JSON.parse(e.newValue));}catch(err){}}
+});
+window.addEventListener("message",e=>{if(e.data&&e.data.v)receive(e.data);});
+
+function loadMirror(){
+  try{const raw=localStorage.getItem(LS_LIVE);return raw?JSON.parse(raw):null;}catch(e){return null;}
+}
+function receive(p){
+  if(!p||p.v!==1)return;
+  if(demo&&Date.now()-lastRecv<400)return;
+  demo=false;$("#btnDemo").classList.remove("on");
+  apply(p);lastRecv=Date.now();showOverlay(false);
+}
+/* 兜底轮询：防止个别环境不派发 storage 事件 */
+setInterval(()=>{
+  if(demo)return;
+  const p=loadMirror();
+  if(p&&p.ts&&(!LIVE||p.ts>LIVE.ts)){apply(p);lastRecv=Date.now();showOverlay(false);}
+  const stale=Date.now()-lastRecv>3000;
+  $("#connState").className="dot "+(stale?"stale":"live");
+  $("#connState").textContent=stale?"等待计分台数据":"已连接计分台";
+},250);
+
+/* ---------- 渲染 ---------- */
+function blocks(used,limit){
+  const n=Math.max(limit||0,used||0);
+  let s="";for(let i=0;i<n;i++)s+='<i class="'+(i<used?"on":"")+'"></i>';
+  return s;
+}
+function rosterHTML(list,limit){
+  if(!list||!list.length)return '<div class="prow empty">暂无球员数据</div>';
+  const more=list.length>limit;
+  let h=list.slice(0,limit).map(p=>{
+    let dots="";
+    if(!p.out)for(let i=0;i<(LIVE?LIVE.foulLimit:5);i++)dots+='<i class="'+(i<p.pf?"on":"")+'"></i>';
+    return '<div class="prow '+(p.out?"gone":(p.onCourt?"":"bench"))+'">'
+      +'<span class="pnum">'+esc(p.num)+'</span>'
+      +'<span class="pname">'+esc(p.name)+'</span>'
+      +'<span class="dots">'+dots+'</span>'
+      +'<span class="ppts">'+(p.out?"离场":(p.pts==null?0:p.pts))+'</span></div>';
+  }).join("");
+  if(more)h+='<div class="prow empty">… 还有 '+(list.length-limit)+' 名球员</div>';
+  return h;
+}
+function apply(p){
+  if(!p||p.v!==1)return;
+  LIVE=p;baseTs=Date.now();baseClock=p.clockMs;baseShot=p.shotMs;
+  const t=p.teams||[];
+  $("#eventName").textContent=p.eventName||p.rule||"篮球比赛";
+  ["home","away"].forEach((side,i)=>{
+    const d=t[i]||{};
+    const key=side.charAt(0).toUpperCase()+side.slice(1);
+    $("#name"+key).textContent=d.name||"—";
+    $("#score"+key).textContent=d.score==null?0:d.score;
+    $("#foul"+key).textContent=d.fouls==null?0:d.fouls;
+    $("#to"+key).innerHTML=blocks(d.tUsed,d.tLimit);
+    $("#bonus"+key).classList.toggle("on",!!d.bonus);
+    $("#roster"+key).innerHTML=rosterHTML(d.players,10);
+  });
+  const pc=$("#periodChip");
+  pc.textContent=p.period||"—";
+  pc.classList.toggle("ot",!!p.isOT||!!p.periodOver);
+  const pos=p.possession==="away"?"away":"home";
+  const box=$("#poss");
+  box.className="poss "+pos;
+  box.querySelector(".ar").textContent=pos==="home"?"◀":"▶";
+  $("#possName").textContent=((t[pos==="home"?0:1]||{}).name||"—")+"球权";
+  $("#shotBox").classList.toggle("off",!p.shotEnabled);
+  paintClocks();
+}
+function paintClocks(){
+  if(!LIVE)return;
+  let ms=baseClock,sh=baseShot;
+  if(LIVE.clockRunning){const dt=Date.now()-baseTs;ms-=dt;sh-=dt;}
+  ms=Math.max(0,ms);sh=Math.max(0,sh);
+  const s=ms/1000;
+  const txt=String(Math.floor(s/60)).padStart(2,"0")+":"+String(Math.floor(s%60)).padStart(2,"0")+"."+Math.floor((s%1)*10);
+  const c=$("#clock");
+  c.textContent=txt;
+  c.classList.toggle("low",ms<=60000&&ms>0);
+  c.classList.toggle("done",ms<=0);
+  if(prevClock!==null&&prevClock>0&&ms<=0)c.classList.add("clock-flash");
+  prevClock=ms;
+  const sb=$("#shot");
+  if(LIVE.shotEnabled){
+    const st=sh/1000;
+    sb.textContent=st<5?st.toFixed(1):String(Math.ceil(st));
+    sb.classList.toggle("low",sh<=5000);
+  }else sb.textContent="--";
+}
+function showOverlay(on){$("#overlay").classList.toggle("hide",!on);}
+
+/* ---------- 演示数据 ---------- */
+function demoPayload(){
+  const pl=(num,name,pf,pts,onCourt,out)=>({num,name,pf,pts,onCourt:!!onCourt,out:!!out});
+  const mk=(name,score,ps,fouls,bonus,tUsed,players)=>({name,score,ps,fouls,bonus,tUsed,tLimit:2,players});
+  return{v:1,ts:Date.now(),
+    teams:[
+      mk("浙江稠州银行",76,18,3,false,1,[
+        pl(2,"王佳琦",2,8,1),pl(3,"胡多灵",1,9,1),pl(6,"帕克",3,10,1),
+        pl(8,"董可尔",0,12,1),pl(9,"张敬一",1,5,1),pl(11,"孙凤艺",2,7,0),
+        pl(14,"单陈楠",4,4,0,1),pl(15,"林秀婷",0,0,0),pl(23,"王佳怡",1,3,0)]),
+      mk("四川蜀道远达",104,24,1,false,0,[
+        pl(0,"田媛媛",0,5,1),pl(2,"李梦",1,16,1),pl(4,"贾赛琪",0,2,1),
+        pl(5,"李双菲",0,10,1),pl(6,"唐子婷",1,8,1),pl(7,"王思雨",0,15,1),
+        pl(12,"唐晨峥",0,6,0),pl(13,"韩旭",2,17,0),pl(16,"肖桐",0,0,0)])
+    ],
+    period:"第 4 节",isOT:false,periodOver:false,
+    clockMs:0,clockRunning:false,shotMs:14000,shotEnabled:true,
+    possession:"away",rule:"FIBA 国际篮联标准",eventName:"2025-2026赛季中国女子篮球联赛",
+    foulLimit:5};
+}
+
+/* ---------- 快捷键 ---------- */
+window.addEventListener("keydown",e=>{
+  const k=e.key.toLowerCase();
+  if(k==="f"){e.preventDefault();$("#btnFs").click();}
+  else if(k==="d"){$("#btnTheme").click();}
+  else if(k==="p"){$("#btnDemo").click();}
+  else if(k==="+"||k==="="){nudgeScale(0.1);}
+  else if(k==="-"||k==="_"){nudgeScale(-0.1);}
+});
+window.addEventListener("resize",paintClocks);
+
+/* ---------- 启动 ---------- */
+applyPref();
+(function init(){
+  const q=new URLSearchParams(location.search);
+  if(q.has("demo")||q.has("preview")){demo=true;$("#btnDemo").classList.add("on");apply(demoPayload());lastRecv=Date.now();return;}
+  const s=q.get("s");
+  if(s){try{const p=JSON.parse(decodeURIComponent(escape(atob(s))));if(p&&p.v===1){receive(p);return;}}catch(e){}}
+  const p=loadMirror();
+  if(p&&p.v===1){apply(p);lastRecv=Date.now();showOverlay(false);}
+  else showOverlay(true);
+})();
+setInterval(()=>{if(LIVE&&!demo)paintClocks();},100);
+</script>
+</body>
+</html>
